@@ -78,13 +78,13 @@
   <nav class="fixed top-0 left-0 right-0 z-40 nav-blur border-b">
     <div class="max-w-7xl mx-auto px-6 py-3.5 flex items-center justify-between flex-wrap gap-4">
       <div class="flex items-center gap-3">
-        <!-- Logo Kelompok Maburai (Contoh menggunakan SVG lambang rumah/masjid minimalis atau inisial M berlogo) -->
-        <div class="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg text-white shadow-sm" style="background: linear-gradient(135deg, #0284c7, #0d9488);">
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <!-- Logo Inisial KM -->
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-base text-white shadow-sm" style="background: linear-gradient(135deg, #0284c7, #0d9488);">
+          KM
         </div>
         <div>
           <h1 class="text-base font-bold tracking-tight" style="color: var(--text-primary);">Kelompok Maburai</h1>
-          <p class="text-xs" style="color: var(--text-secondary);">Tabalong, 2026</p>
+          <p class="text-xs" style="color: var(--text-secondary);">Desa Tanjung, 2026</p>
         </div>
       </div>
       <div class="flex items-center gap-2.5 flex-wrap">
@@ -278,7 +278,7 @@
       html.setAttribute('data-theme', newTheme);
       localStorage.setItem('theme', newTheme);
       updateThemeIcons(newTheme);
-      renderCharts(); // Re-render grafik agar warna teks menyesuaikan tema
+      renderCharts();
     }
 
     function updateThemeIcons(theme) {
