@@ -553,7 +553,7 @@
 
         Chart.register(ChartDataLabels);
 
-        // Kategori Usia Jamaah
+        // Kategori Usia Jamaah (Diperbaiki dengan padding top & grace pada sumbu y)
         chartInstances.ageCategory = new Chart(document.getElementById('ageCategoryChart').getContext('2d'), {
           type: 'bar',
           data: {
@@ -562,12 +562,20 @@
           },
           options: {
             responsive: true, maintainAspectRatio: false,
+            layout: { 
+              padding: { top: 20 } 
+            },
             plugins: {
               legend: { display: false },
               datalabels: { color: isDark ? '#f8fafc' : '#1e293b', font: { weight: 'bold', size: 11 }, anchor: 'end', align: 'top' }
             },
             scales: {
-              y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor } },
+              y: { 
+                beginAtZero: true, 
+                grid: { color: gridColor }, 
+                ticks: { color: textColor },
+                grace: '20%' 
+              },
               x: { grid: { display: false }, ticks: { color: textColor } }
             }
           }
