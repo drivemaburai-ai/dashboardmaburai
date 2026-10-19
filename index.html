@@ -260,7 +260,7 @@
       document.getElementById('ratio-wanita').textContent = wanitaPct + '%';
     }
 
-    // Perbaikan utama: Cek global Chart.getChart() untuk mencegah canvas tumpang tindih
+    // Fungsi render chart yang diperbarui untuk membersihkan chart lama otomatis via Chart.getChart()
     function renderCharts() {
       const chartIds = ['ageCategoryChart', 'maritalChart', 'generusChart', 'generusDetailChart', 'kasChart'];
       
