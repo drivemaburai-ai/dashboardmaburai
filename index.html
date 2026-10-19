@@ -3,6 +3,9 @@
 
     let dbData = { total: 0, pria: 0, wanita: 0, kk: 0, ageCategory: { labels: [], values: [] }, generus: { labels: [], values: [], pria: [], wanita: [] }, marital: { labels: [], values: [] } };
     let financeData = { kas: { total: 0, pemasukan: 0, pengeluaran: 0 }, items: [] };
+    
+    // Objek global untuk menyimpan instance chart agar mudah dihancurkan sebelum dirender ulang
+    const chartInstances = {};
 
     // Fungsi Toggle Tema Terang & Gelap
     function toggleTheme() {
@@ -260,17 +263,15 @@
       document.getElementById('ratio-wanita').textContent = wanitaPct + '%';
     }
 
-    // Fungsi render chart yang diperbarui untuk membersihkan chart lama otomatis via Chart.getChart()
-    function renderCharts() {
-      const chartIds = ['ageCategoryChart', 'maritalChart', 'generusChart', 'generusDetailChart', 'kasChart'];
-      
-      chartIds.forEach(id => {
-        const existingChart = Chart.getChart(id);
-        if (existingChart) {
-          existingChart.destroy();
-        }
-      });
+    // Fungsi helper untuk menghancurkan chart dengan aman sebelum digambar ulang
+    function safeDestroy(chartKey) {
+      if (chartInstances[chartKey]) {
+        chartInstances[chartKey].destroy();
+        delete chartInstances[chartKey];
+      }
+    }
 
+    function renderCharts() {
       const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
       const textColor = isDark ? '#94a3b8' : '#475569';
       const gridColor = isDark ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9';
@@ -280,7 +281,8 @@
       }
 
       // 1. Kategori Usia Jamaah
-      new Chart(document.getElementById('ageCategoryChart').getContext('2d'), {
+      safeDestroy('ageCategory');
+      chartInstances.ageCategory = new Chart(document.getElementById('ageCategoryChart').getContext('2d'), {
         type: 'bar',
         data: {
           labels: dbData.ageCategory.labels,
@@ -301,7 +303,8 @@
       });
 
       // 2. Status Pernikahan
-      new Chart(document.getElementById('maritalChart').getContext('2d'), {
+      safeDestroy('marital');
+      chartInstances.marital = new Chart(document.getElementById('maritalChart').getContext('2d'), {
         type: 'bar',
         data: {
           labels: dbData.marital.labels,
@@ -322,7 +325,8 @@
       });
 
       // 3. Generus Donut
-      new Chart(document.getElementById('generusChart').getContext('2d'), {
+      safeDestroy('generus');
+      chartInstances.generus = new Chart(document.getElementById('generusChart').getContext('2d'), {
         type: 'doughnut',
         data: {
           labels: dbData.generus.labels.map(l => l.replace(/\s*\([^)]+\)/, '')),
@@ -338,7 +342,8 @@
       });
 
       // 4. Generus Detail Bar
-      new Chart(document.getElementById('generusDetailChart').getContext('2d'), {
+      safeDestroy('generusDetail');
+      chartInstances.generusDetail = new Chart(document.getElementById('generusDetailChart').getContext('2d'), {
         type: 'bar',
         data: {
           labels: dbData.generus.labels,
@@ -371,7 +376,8 @@
       const kasSaldoValues = financeData.items.map(i => i.saldo);
 
       // 5. Grafik Ringkasan Kas
-      new Chart(document.getElementById('kasChart').getContext('2d'), {
+      safeDestroy('kas');
+      chartInstances.kas = new Chart(document.getElementById('kasChart').getContext('2d'), {
         type: 'bar',
         data: {
           labels: kasLabels,
