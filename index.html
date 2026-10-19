@@ -1,270 +1,4 @@
-<!DOCTYPE html>
-<html lang="id" data-theme="light">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kelompok Maburai 2026</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link href="https://unpkg.com/aos@2.3.4/dist/aos.css" rel="stylesheet">
-  <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
-  <style>
-    :root {
-      --bg-primary: #f8fafc;
-      --bg-secondary: #ffffff;
-      --bg-card: #ffffff;
-      --text-primary: #1e293b;
-      --text-secondary: #64748b;
-      --accent-primary: #0ea5e9;
-      --accent-secondary: #0d9488;
-      --border-color: #e2e8f0;
-      --success: #10b981;
-      --warning: #f59e0b;
-      --danger: #ef4444;
-    }
-    [data-theme="dark"] {
-      --bg-primary: #0b0f19;
-      --bg-secondary: #131b2e;
-      --bg-card: #131b2e;
-      --text-primary: #f8fafc;
-      --text-secondary: #94a3b8;
-      --accent-primary: #38bdf8;
-      --accent-secondary: #2dd4bf;
-      --border-color: rgba(148, 163, 184, 0.15);
-    }
-    * { font-family: 'Inter', system-ui, sans-serif; box-sizing: border-box; }
-    body {
-      margin: 0; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; padding-top: 80px;
-      transition: background 0.3s ease, color 0.3s ease;
-    }
-    .gradient-text { background: linear-gradient(135deg, #0284c7, #0d9488); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-    [data-theme="dark"] .gradient-text { background: linear-gradient(135deg, #38bdf8, #2dd4bf); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-    .glass-card {
-      background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px;
-      transition: all 0.3s ease; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-    }
-    [data-theme="dark"] .glass-card { box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-    .glass-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.08); border-color: #cbd5e1; }
-    [data-theme="dark"] .glass-card:hover { border-color: rgba(56, 189, 248, 0.3); }
-    .hero-gradient { background: linear-gradient(135deg, #0284c7 0%, #0d9488 100%); color: white; }
-    [data-theme="dark"] .hero-gradient { background: linear-gradient(135deg, #0369a1 0%, #0f766e 100%); }
-    .btn-action { 
-      background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 8px 12px; 
-      color: var(--text-primary); cursor: pointer; transition: all 0.2s ease; font-weight: 500; display: flex; align-items: center; justify-content: center;
-    }
-    .btn-action:hover { background: var(--border-color); }
-    .nav-blur { background: var(--bg-primary); opacity: 0.95; backdrop-filter: blur(12px); border-color: var(--border-color); }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .spinner { width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top-color: #0284c7; border-radius: 50%; animation: spin 0.8s linear infinite; }
-    .chart-container { position: relative; height: 340px; width: 100%; }
-    .toast { transform: translateX(120%); transition: transform 0.3s ease; }
-    .toast.show { transform: translateX(0); }
-    .modal-overlay { opacity: 0; pointer-events: none; transition: opacity 0.3s ease; backdrop-filter: blur(4px); }
-    .modal-overlay.show { opacity: 1; pointer-events: auto; }
-    .kpi-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
-    @media (max-width: 768px) { .chart-container { height: 260px; } }
-  </style>
-</head>
-<body>
-  <!-- Loading Screen -->
-  <div id="loading-screen" class="fixed inset-0 z-50 flex flex-col items-center justify-center" style="background: var(--bg-primary);">
-    <div class="spinner mb-4"></div>
-    <p class="text-sm font-medium" style="color: var(--text-secondary);">Memuat data kelompok...</p>
-  </div>
-
-  <!-- Navigation -->
-  <nav class="fixed top-0 left-0 right-0 z-40 nav-blur border-b">
-    <div class="max-w-7xl mx-auto px-6 py-3.5 flex items-center justify-between flex-wrap gap-4">
-      <div class="flex items-center gap-3">
-        <!-- Logo Inisial KM -->
-        <div class="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-base text-white shadow-sm" style="background: linear-gradient(135deg, #0284c7, #0d9488);">
-          KM
-        </div>
-        <div>
-          <h1 class="text-base font-bold tracking-tight" style="color: var(--text-primary);">Kelompok Maburai</h1>
-          <p class="text-xs" style="color: var(--text-secondary);">Desa Tanjung, 2026</p>
-        </div>
-      </div>
-      <div class="flex items-center gap-2.5 flex-wrap">
-        <!-- Tombol Theme Toggle (Terang / Gelap) -->
-        <button onclick="toggleTheme()" class="btn-action" title="Ganti Tema Terang/Gelap">
-          <svg id="theme-icon-light" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="hidden"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-          <svg id="theme-icon-dark" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        </button>
-        <!-- Tombol Print -->
-        <button onclick="window.print()" class="btn-action" title="Cetak Dashboard">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-        </button>
-      </div>
-    </div>
-  </nav>
-
-  <!-- Hero Banner -->
-  <section class="relative py-12 px-6 hero-gradient text-center rounded-b-[2rem] shadow-sm mb-8">
-    <div class="max-w-4xl mx-auto relative z-10">
-      <h2 class="text-3xl md:text-5xl font-bold text-white mb-3 tracking-tight">Kelompok Maburai</h2>
-      <p class="text-slate-100 text-sm md:text-base max-w-xl mx-auto font-normal leading-relaxed">Pusat informasi demografi jamaah dan keuangan kelompok.</p>
-    </div>
-  </section>
-
-  <!-- Main Content -->
-  <main class="max-w-7xl mx-auto px-6 py-2">
-    <!-- Last Update -->
-    <div class="flex justify-between items-center mb-6 px-1 flex-wrap gap-4">
-      <p class="text-xs md:text-sm flex items-center gap-2 font-medium" style="color: var(--text-secondary);">
-        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-        Terakhir diperbarui: <span id="last-update" class="font-semibold" style="color: var(--text-primary);">-</span>
-      </p>
-    </div>
-
-    <!-- KPI Cards -->
-    <section class="mb-8">
-      <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <div class="glass-card p-5" data-aos="fade-up">
-          <div class="kpi-icon mb-3 bg-sky-500/10 text-sky-500">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-          </div>
-          <p class="text-2xl font-bold tracking-tight mb-0.5" style="color: var(--text-primary);" id="kpi-total">0</p>
-          <p class="text-xs font-medium uppercase tracking-wider" style="color: var(--text-secondary);">Total Jamaah</p>
-        </div>
-        <div class="glass-card p-5" data-aos="fade-up" data-aos-delay="50">
-          <div class="kpi-icon mb-3 bg-teal-500/10 text-teal-500">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-          </div>
-          <p class="text-2xl font-bold tracking-tight mb-0.5" style="color: var(--text-primary);" id="kpi-kk">0</p>
-          <p class="text-xs font-medium uppercase tracking-wider" style="color: var(--text-secondary);">Jumlah KK</p>
-        </div>
-        <div class="glass-card p-5" data-aos="fade-up" data-aos-delay="100">
-          <div class="kpi-icon mb-3 bg-emerald-500/10 text-emerald-500">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="5"></circle><path d="M20 21a8 8 0 0 0-16 0"></path><circle cx="5" cy="6" r="2.5"></circle><circle cx="19" cy="6" r="2.5"></circle></svg>
-          </div>
-          <p class="text-2xl font-bold text-emerald-500 tracking-tight mb-0.5" id="kpi-generus">0</p>
-          <p class="text-xs font-medium uppercase tracking-wider" style="color: var(--text-secondary);">Jumlah Generus</p>
-        </div>
-        <div class="glass-card p-5" data-aos="fade-up" data-aos-delay="150">
-          <div class="kpi-icon mb-3 bg-blue-500/10 text-blue-500">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"></circle><path d="M5.5 21a8.38 8.38 0 0 1 13 0"></path></svg>
-          </div>
-          <p class="text-2xl font-bold text-blue-500 tracking-tight mb-0.5" id="kpi-pria">0</p>
-          <p class="text-xs font-medium uppercase tracking-wider" style="color: var(--text-secondary);">Laki-laki</p>
-        </div>
-        <div class="glass-card p-5" data-aos="fade-up" data-aos-delay="200">
-          <div class="kpi-icon mb-3 bg-rose-500/10 text-rose-500">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"></circle><path d="M5.5 21a8.38 8.38 0 0 1 13 0"></path></svg>
-          </div>
-          <p class="text-2xl font-bold text-rose-500 tracking-tight mb-0.5" id="kpi-wanita">0</p>
-          <p class="text-xs font-medium uppercase tracking-wider" style="color: var(--text-secondary);">Perempuan</p>
-        </div>
-      </div>
-
-      <!-- Gender Ratio Progress Bar -->
-      <div class="glass-card p-5 mb-6" data-aos="fade-up">
-        <div class="flex justify-between items-center mb-2.5">
-          <h3 class="font-semibold text-sm tracking-wide" style="color: var(--text-primary);">Rasio Jenis Kelamin</h3>
-          <div class="flex items-center gap-4 text-xs">
-            <span class="flex items-center gap-1.5 font-medium text-blue-500"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Laki-laki: <strong id="ratio-pria">0%</strong></span>
-            <span class="flex items-center gap-1.5 font-medium text-rose-400"><span class="w-2.5 h-2.5 rounded-full bg-rose-400"></span> Perempuan: <strong id="ratio-wanita">0%</strong></span>
-          </div>
-        </div>
-        <div class="relative">
-          <div class="flex h-4 rounded-full overflow-hidden bg-slate-200/50 p-0.5" id="ratio-bar"></div>
-        </div>
-      </div>
-
-      <!-- Charts Grid -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div class="glass-card p-5" data-aos="fade-up">
-          <h3 class="font-semibold text-base mb-3" style="color: var(--text-primary);">Kategori Jamaah</h3>
-          <div class="chart-container"><canvas id="ageCategoryChart"></canvas></div>
-        </div>
-        <div class="glass-card p-5" data-aos="fade-up" data-aos-delay="100">
-          <h3 class="font-semibold text-base mb-3" style="color: var(--text-primary);">Status Pernikahan</h3>
-          <div class="chart-container"><canvas id="maritalChart"></canvas></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Generus Section -->
-    <section class="mb-10">
-      <div class="grid md:grid-cols-2 gap-5">
-        <div class="glass-card p-5" data-aos="fade-up">
-          <h3 class="font-semibold text-base mb-3" style="color: var(--text-primary);">Generus Jamaah</h3>
-          <div class="chart-container"><canvas id="generusChart"></canvas></div>
-        </div>
-        <div class="glass-card p-5" data-aos="fade-up" data-aos-delay="100">
-          <h3 class="font-semibold text-base mb-3" style="color: var(--text-primary);">Detail Generus</h3>
-          <div class="chart-container"><canvas id="generusDetailChart"></canvas></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Keuangan Section -->
-    <section id="keuangan" class="mb-10">
-      <h2 class="text-xl font-bold mb-5 tracking-tight" style="color: var(--text-primary);">Keuangan Kelompok</h2>
-
-      <!-- Summary Cards -->
-      <div class="grid md:grid-cols-3 gap-5 mb-6">
-        <div class="glass-card p-5 border-l-4 border-l-sky-500" data-aos="fade-up">
-          <p class="text-xs font-medium mb-1" style="color: var(--text-secondary);">Kas Tersedia</p>
-          <p class="text-2xl font-bold tracking-tight" style="color: var(--text-primary);" id="fin-kas">Rp 0</p>
-          <p class="text-xs mt-1" style="color: var(--text-secondary);">Akumulasi sisa saldo seluruh kas</p>
-        </div>
-        <div class="glass-card p-5 border-l-4 border-l-emerald-500" data-aos="fade-up" data-aos-delay="100">
-          <p class="text-xs font-medium mb-1" style="color: var(--text-secondary);">Total Pemasukan</p>
-          <p class="text-2xl font-bold text-emerald-500 tracking-tight" id="fin-pemasukan">Rp 0</p>
-          <p class="text-xs mt-1" style="color: var(--text-secondary);">Akumulasi kredit seluruh kas</p>
-        </div>
-        <div class="glass-card p-5 border-l-4 border-l-rose-500" data-aos="fade-up" data-aos-delay="200">
-          <p class="text-xs font-medium mb-1" style="color: var(--text-secondary);">Total Pengeluaran</p>
-          <p class="text-2xl font-bold text-rose-500 tracking-tight" id="fin-pengeluaran">Rp 0</p>
-          <p class="text-xs mt-1" style="color: var(--text-secondary);">Akumulasi debit seluruh kas</p>
-        </div>
-      </div>
-
-      <!-- Ringkasan Kas Full Width -->
-      <div class="glass-card p-6" data-aos="fade-up">
-        <div class="flex justify-between items-center mb-5 flex-wrap gap-4">
-          <div>
-            <h3 class="text-lg font-bold tracking-tight" style="color: var(--text-primary);">Ringkasan Kas</h3>
-            <p class="text-xs mt-0.5" style="color: var(--text-secondary);">Klik salah satu bar grafik di bawah untuk melihat rincian kas secara mendalam.</p>
-          </div>
-          <span class="px-2.5 py-1 rounded-md text-xs font-medium bg-sky-500/10 text-sky-500 border border-sky-500/20">Interaktif</span>
-        </div>
-        <div class="chart-container" style="height: 380px;"><canvas id="kasChart"></canvas></div>
-      </div>
-    </section>
-  </main>
-
-  <!-- Footer -->
-  <footer class="border-t py-6 px-6 text-center" style="border-color: var(--border-color);">
-    <p class="text-xs font-medium" style="color: var(--text-secondary);">
-      &copy; 2026 Kelompok Maburai.
-    </p>
-  </footer>
-
-  <!-- Modal Detail Kas -->
-  <div id="modal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-    <div class="glass-card max-w-md w-full shadow-xl overflow-hidden" style="background: var(--bg-secondary);">
-      <div class="p-5 border-b flex items-center justify-between" style="border-color: var(--border-color);">
-        <h3 id="modal-title" class="font-bold text-base" style="color: var(--text-primary);">Detail Kas</h3>
-        <button onclick="closeModal()" class="w-7 h-7 rounded-full bg-slate-500/10 flex items-center justify-center transition-all font-bold">&times;</button>
-      </div>
-      <div id="modal-content" class="p-5 space-y-3"></div>
-    </div>
-  </div>
-
-  <!-- Toast -->
-  <div id="toast" class="toast fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-xl shadow-lg flex items-center gap-3 border" style="background: var(--bg-secondary); border-color: rgba(239, 68, 68, 0.3);">
-    <span class="text-lg text-rose-500 font-bold">&#9888;</span>
-    <div>
-      <p id="toast-title" class="font-bold text-xs" style="color: var(--text-primary);">Error</p>
-      <p id="toast-message" class="text-xs" style="color: var(--text-secondary);"></p>
-    </div>
-  </div>
-
-  <script>
+<script>
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyuomsVlvTt12Se7lnb1oMb-m9QgYqPqXTHKvVJn9nyRQyaoyqml0igzK_jzh_hcVSt/exec";
 
     let dbData = { total: 0, pria: 0, wanita: 0, kk: 0, ageCategory: { labels: [], values: [] }, generus: { labels: [], values: [], pria: [], wanita: [] }, marital: { labels: [], values: [] } };
@@ -526,190 +260,171 @@
       document.getElementById('ratio-wanita').textContent = wanitaPct + '%';
     }
 
-    const chartInstances = {};
-    let isRenderingCharts = false;
-
-    function safeDestroyChart(key) {
-      if (chartInstances[key]) {
-        chartInstances[key].destroy();
-        delete chartInstances[key];
-      }
-    }
-
-    function destroyAllCharts() {
-      Object.keys(chartInstances).forEach(key => safeDestroyChart(key));
-    }
-
+    // Perbaikan utama: Cek global Chart.getChart() untuk mencegah canvas tumpang tindih
     function renderCharts() {
-      if (isRenderingCharts) return;
-      isRenderingCharts = true;
+      const chartIds = ['ageCategoryChart', 'maritalChart', 'generusChart', 'generusDetailChart', 'kasChart'];
+      
+      chartIds.forEach(id => {
+        const existingChart = Chart.getChart(id);
+        if (existingChart) {
+          existingChart.destroy();
+        }
+      });
 
-      try {
-        destroyAllCharts();
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const textColor = isDark ? '#94a3b8' : '#475569';
+      const gridColor = isDark ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9';
 
-        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-        const textColor = isDark ? '#94a3b8' : '#475569';
-        const gridColor = isDark ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9';
-
+      if (!Chart.registry.plugins.get('datalabels')) {
         Chart.register(ChartDataLabels);
-
-        // Kategori Usia Jamaah (Diperbaiki dengan padding top & grace pada sumbu y)
-        chartInstances.ageCategory = new Chart(document.getElementById('ageCategoryChart').getContext('2d'), {
-          type: 'bar',
-          data: {
-            labels: dbData.ageCategory.labels,
-            datasets: [{ data: dbData.ageCategory.values, backgroundColor: ['#fb7185', '#a78bfa', '#38bdf8', '#fbbf24'], borderRadius: 8 }]
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            layout: { 
-              padding: { top: 20 } 
-            },
-            plugins: {
-              legend: { display: false },
-              datalabels: { color: isDark ? '#f8fafc' : '#1e293b', font: { weight: 'bold', size: 11 }, anchor: 'end', align: 'top' }
-            },
-            scales: {
-              y: { 
-                beginAtZero: true, 
-                grid: { color: gridColor }, 
-                ticks: { color: textColor },
-                grace: '20%' 
-              },
-              x: { grid: { display: false }, ticks: { color: textColor } }
-            }
-          }
-        });
-
-        // Status Pernikahan
-        chartInstances.marital = new Chart(document.getElementById('maritalChart').getContext('2d'), {
-          type: 'bar',
-          data: {
-            labels: dbData.marital.labels,
-            datasets: [{ data: dbData.marital.values, backgroundColor: ['#34d399', '#60a5fa', '#fb7185', '#a78bfa'], borderRadius: 8 }]
-          },
-          options: {
-            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-            layout: { padding: { right: 35 } },
-            plugins: {
-              legend: { display: false },
-              datalabels: { color: isDark ? '#f8fafc' : '#1e293b', font: { weight: 'bold', size: 11 }, anchor: 'end', align: 'right' }
-            },
-            scales: {
-              x: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor }, grace: '20%' },
-              y: { grid: { display: false }, ticks: { color: textColor } }
-            }
-          }
-        });
-
-        // Generus Donut
-        chartInstances.generus = new Chart(document.getElementById('generusChart').getContext('2d'), {
-          type: 'doughnut',
-          data: {
-            labels: dbData.generus.labels.map(l => l.replace(/\s*\([^)]+\)/, '')),
-            datasets: [{ data: dbData.generus.values, backgroundColor: ['#fb7185', '#a78bfa', '#38bdf8', '#fbbf24', '#34d399'], borderWidth: 2, borderColor: isDark ? '#131b2e' : '#ffffff' }]
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false, cutout: '65%',
-            plugins: {
-              legend: { position: 'bottom', labels: { color: textColor, boxWidth: 12, font: { size: 11 } } },
-              datalabels: { color: '#ffffff', font: { weight: 'bold', size: 10 } }
-            }
-          }
-        });
-
-        // Generus Detail Bar
-        chartInstances.generusDetail = new Chart(document.getElementById('generusDetailChart').getContext('2d'), {
-          type: 'bar',
-          data: {
-            labels: dbData.generus.labels,
-            datasets: [
-              { label: 'Laki-laki', data: dbData.generus.pria, backgroundColor: '#60a5fa', borderRadius: 6 },
-              { label: 'Perempuan', data: dbData.generus.wanita, backgroundColor: '#fb7185', borderRadius: 6 }
-            ]
-          },
-          options: {
-            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-            layout: { padding: { right: 25 } },
-            plugins: {
-              legend: { position: 'top', labels: { color: textColor, boxWidth: 12 } },
-              datalabels: {
-                color: isDark ? '#f8fafc' : '#1e293b',
-                font: { weight: 'bold', size: 11 },
-                anchor: 'end',
-                align: 'right',
-                formatter: (value) => value > 0 ? value : ''
-              }
-            },
-            scales: {
-              x: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor }, grace: '15%' },
-              y: { grid: { display: false }, ticks: { color: textColor, font: { size: 11, weight: '500' } } }
-            }
-          }
-        });
-
-        const kasLabels = financeData.items.map(i => i.namaKas);
-        const kasSaldoValues = financeData.items.map(i => i.saldo);
-
-        // Grafik Ringkasan Kas
-        chartInstances.kas = new Chart(document.getElementById('kasChart').getContext('2d'), {
-          type: 'bar',
-          data: {
-            labels: kasLabels,
-            datasets: [{ label: 'Total Saldo', data: kasSaldoValues, backgroundColor: '#0ea5e9', borderRadius: 8 }]
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false, indexAxis: 'y',
-            layout: { padding: { right: 35 } },
-            onClick: (event, elements) => {
-              if (elements.length > 0) {
-                const index = elements[0].index;
-                const item = financeData.items[index];
-                if (item) {
-                  const content = `
-                    <div class="space-y-3 text-sm">
-                      <div class="flex justify-between items-center border-b pb-2" style="border-color: var(--border-color);">
-                        <span style="color: var(--text-secondary);">Nama Kas</span>
-                        <span class="font-bold text-sky-500">${item.namaKas}</span>
-                      </div>
-                      <div class="flex justify-between items-center border-b pb-2" style="border-color: var(--border-color);">
-                        <span style="color: var(--text-secondary);">Total Pemasukan</span>
-                        <span class="font-semibold text-emerald-500">${formatCurrency(item.kredit)}</span>
-                      </div>
-                      <div class="flex justify-between items-center border-b pb-2" style="border-color: var(--border-color);">
-                        <span style="color: var(--text-secondary);">Total Pengeluaran</span>
-                        <span class="font-semibold text-rose-500">${formatCurrency(item.debit)}</span>
-                      </div>
-                      <div class="flex justify-between items-center pt-1">
-                        <span class="font-medium" style="color: var(--text-secondary);">Sisa Saldo</span>
-                        <span class="font-bold text-base" style="color: var(--text-primary);">${formatCurrency(item.saldo)}</span>
-                      </div>
-                    </div>
-                  `;
-                  openModal('Rincian Kas: ' + item.namaKas, content);
-                }
-              }
-            },
-            plugins: {
-              legend: { display: false },
-              datalabels: {
-                color: isDark ? '#f8fafc' : '#1e293b',
-                font: { weight: 'bold', size: 11 },
-                anchor: 'end',
-                align: 'right',
-                formatter: (val) => (val >= 1000000 ? (val/1000000).toFixed(1) + 'Jt' : val)
-              }
-            },
-            scales: {
-              x: { grid: { color: gridColor }, ticks: { color: textColor }, grace: '15%' },
-              y: { grid: { display: false }, ticks: { color: textColor, font: { size: 11, weight: '500' } } }
-            }
-          }
-        });
-
-      } finally {
-        isRenderingCharts = false;
       }
+
+      // 1. Kategori Usia Jamaah
+      new Chart(document.getElementById('ageCategoryChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: dbData.ageCategory.labels,
+          datasets: [{ data: dbData.ageCategory.values, backgroundColor: ['#fb7185', '#a78bfa', '#38bdf8', '#fbbf24'], borderRadius: 8 }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          layout: { padding: { top: 20 } },
+          plugins: {
+            legend: { display: false },
+            datalabels: { color: isDark ? '#f8fafc' : '#1e293b', font: { weight: 'bold', size: 11 }, anchor: 'end', align: 'top' }
+          },
+          scales: {
+            y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor }, grace: '20%' },
+            x: { grid: { display: false }, ticks: { color: textColor } }
+          }
+        }
+      });
+
+      // 2. Status Pernikahan
+      new Chart(document.getElementById('maritalChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: dbData.marital.labels,
+          datasets: [{ data: dbData.marital.values, backgroundColor: ['#34d399', '#60a5fa', '#fb7185', '#a78bfa'], borderRadius: 8 }]
+        },
+        options: {
+          indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          layout: { padding: { right: 35 } },
+          plugins: {
+            legend: { display: false },
+            datalabels: { color: isDark ? '#f8fafc' : '#1e293b', font: { weight: 'bold', size: 11 }, anchor: 'end', align: 'right' }
+          },
+          scales: {
+            x: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor }, grace: '20%' },
+            y: { grid: { display: false }, ticks: { color: textColor } }
+          }
+        }
+      });
+
+      // 3. Generus Donut
+      new Chart(document.getElementById('generusChart').getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: dbData.generus.labels.map(l => l.replace(/\s*\([^)]+\)/, '')),
+          datasets: [{ data: dbData.generus.values, backgroundColor: ['#fb7185', '#a78bfa', '#38bdf8', '#fbbf24', '#34d399'], borderWidth: 2, borderColor: isDark ? '#131b2e' : '#ffffff' }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, cutout: '65%',
+          plugins: {
+            legend: { position: 'bottom', labels: { color: textColor, boxWidth: 12, font: { size: 11 } } },
+            datalabels: { color: '#ffffff', font: { weight: 'bold', size: 10 } }
+          }
+        }
+      });
+
+      // 4. Generus Detail Bar
+      new Chart(document.getElementById('generusDetailChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: dbData.generus.labels,
+          datasets: [
+            { label: 'Laki-laki', data: dbData.generus.pria, backgroundColor: '#60a5fa', borderRadius: 6 },
+            { label: 'Perempuan', data: dbData.generus.wanita, backgroundColor: '#fb7185', borderRadius: 6 }
+          ]
+        },
+        options: {
+          indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          layout: { padding: { right: 25 } },
+          plugins: {
+            legend: { position: 'top', labels: { color: textColor, boxWidth: 12 } },
+            datalabels: {
+              color: isDark ? '#f8fafc' : '#1e293b',
+              font: { weight: 'bold', size: 11 },
+              anchor: 'end',
+              align: 'right',
+              formatter: (value) => value > 0 ? value : ''
+            }
+          },
+          scales: {
+            x: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor }, grace: '15%' },
+            y: { grid: { display: false }, ticks: { color: textColor, font: { size: 11, weight: '500' } } }
+          }
+        }
+      });
+
+      const kasLabels = financeData.items.map(i => i.namaKas);
+      const kasSaldoValues = financeData.items.map(i => i.saldo);
+
+      // 5. Grafik Ringkasan Kas
+      new Chart(document.getElementById('kasChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: kasLabels,
+          datasets: [{ label: 'Total Saldo', data: kasSaldoValues, backgroundColor: '#0ea5e9', borderRadius: 8 }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+          layout: { padding: { right: 35 } },
+          onClick: (event, elements) => {
+            if (elements.length > 0) {
+              const index = elements[0].index;
+              const item = financeData.items[index];
+              if (item) {
+                const content = `
+                  <div class="space-y-3 text-sm">
+                    <div class="flex justify-between items-center border-b pb-2" style="border-color: var(--border-color);">
+                      <span style="color: var(--text-secondary);">Nama Kas</span>
+                      <span class="font-bold text-sky-500">${item.namaKas}</span>
+                    </div>
+                    <div class="flex justify-between items-center border-b pb-2" style="border-color: var(--border-color);">
+                      <span style="color: var(--text-secondary);">Total Pemasukan</span>
+                      <span class="font-semibold text-emerald-500">${formatCurrency(item.kredit)}</span>
+                    </div>
+                    <div class="flex justify-between items-center border-b pb-2" style="border-color: var(--border-color);">
+                      <span style="color: var(--text-secondary);">Total Pengeluaran</span>
+                      <span class="font-semibold text-rose-500">${formatCurrency(item.debit)}</span>
+                    </div>
+                    <div class="flex justify-between items-center pt-1">
+                      <span class="font-medium" style="color: var(--text-secondary);">Sisa Saldo</span>
+                      <span class="font-bold text-base" style="color: var(--text-primary);">${formatCurrency(item.saldo)}</span>
+                    </div>
+                  </div>
+                `;
+                openModal('Rincian Kas: ' + item.namaKas, content);
+              }
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            datalabels: {
+              color: isDark ? '#f8fafc' : '#1e293b',
+              font: { weight: 'bold', size: 11 },
+              anchor: 'end',
+              align: 'right',
+              formatter: (val) => (val >= 1000000 ? (val/1000000).toFixed(1) + 'Jt' : val)
+            }
+          },
+          scales: {
+            x: { grid: { color: gridColor }, ticks: { color: textColor }, grace: '15%' },
+            y: { grid: { display: false }, ticks: { color: textColor, font: { size: 11, weight: '500' } } }
+          }
+        }
+      });
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -722,5 +437,3 @@
       }, 30000);
     });
   </script>
-</body>
-</html>
