@@ -352,28 +352,38 @@
       }
     }
 
+    // Fungsi Klasifikasi Kategori Usia Umum
     function classifyAgeCategory(d) {
       const usia = d.usia;
       const statusLower = (d.status1 || '').toLowerCase();
-      const married = (statusLower === 'kawin' || statusLower === 'nikah');
+      const ketLower = (d.ket || '').toLowerCase();
       
-      if (usia <= 4) return 'Balita';
+      // Jika status atau keterangan eksplisit mencantumkan kawin/nikah
+      const isMarried = statusLower === 'kawin' || statusLower === 'nikah' || statusLower.includes('menikah');
+
+      if (usia <= 5) return 'Balita';
       if (usia > 60) return 'Lansia';
-      if (married) return 'Dewasa';
+      if (isMarried || usia >= 25) return 'Dewasa';
+      
+      // Jika usia antara 6 s.d 24 tahun dan belum menikah, dikategorikan sebagai Generus di grafik utama
       return 'Generus';
     }
 
+    // Fungsi Klasifikasi Detail Generus Berdasarkan Rentang Usia
     function classifyGenerusCategory(d) {
       const usia = d.usia;
       const statusLower = (d.status1 || '').toLowerCase();
-      const married = (statusLower === 'kawin' || statusLower === 'nikah');
-      
-      if (usia <= 4 || usia > 60 || married) return null;
+      const isMarried = statusLower === 'kawin' || statusLower === 'nikah' || statusLower.includes('menikah');
+
+      // Batasan usia generus (misal dari usia 5 sampai 25 tahun yang belum menikah)
+      if (usia < 5 || usia > 25 || isMarried) return null;
+
       if (usia >= 5 && usia <= 6) return 'PAUD (5-6 Tahun)';
       if (usia >= 7 && usia <= 12) return 'Cabe Rawit (Kls 1-6 SD)';
       if (usia >= 13 && usia <= 15) return 'Pra Remaja (SMP)';
       if (usia >= 16 && usia <= 18) return 'Remaja (SMA)';
-      if (usia >= 19) return 'Pra Nikah (19+)';
+      if (usia >= 19 && usia <= 25) return 'Pra Nikah (19+)';
+      
       return null;
     }
 
@@ -403,7 +413,6 @@
       const isPria = (d) => ['l', 'pria', 'laki', 'lk', 'laki-laki', 'laki laki'].includes(d.jk) || d.jk.includes('laki');
       const isWanita = (d) => d.jk === 'p' || d.jk === 'wanita' || d.jk === 'perempuan';
       const statusLower = (d) => (d.status1 || '').toLowerCase();
-      const isMarried = (d) => statusLower(d) === 'kawin' || statusLower(d) === 'nikah';
 
       const pria = database.filter(isPria).length;
       const wanita = database.filter(isWanita).length;
@@ -448,7 +457,7 @@
           else countKawin++;
         } else if (status.includes('janda')) countJanda++;
         else if (status.includes('duda')) countDuda++;
-        else if (status.includes('lajang') || status.includes('single')) countBelumKawin++;
+        else countBelumKawin++;
       });
 
       dbData.database = database;
