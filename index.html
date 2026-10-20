@@ -354,7 +354,9 @@
 
     function classifyAgeCategory(d) {
       const usia = d.usia;
-      const married = (d.status1 || '').toLowerCase().includes('kawin') || (d.status1 || '').toLowerCase().includes('nikah');
+      const statusLower = (d.status1 || '').toLowerCase();
+      const married = (statusLower === 'kawin' || statusLower === 'nikah');
+      
       if (usia <= 4) return 'Balita';
       if (usia > 60) return 'Lansia';
       if (married) return 'Dewasa';
@@ -363,7 +365,9 @@
 
     function classifyGenerusCategory(d) {
       const usia = d.usia;
-      const married = (d.status1 || '').toLowerCase().includes('kawin') || (d.status1 || '').toLowerCase().includes('nikah');
+      const statusLower = (d.status1 || '').toLowerCase();
+      const married = (statusLower === 'kawin' || statusLower === 'nikah');
+      
       if (usia <= 4 || usia > 60 || married) return null;
       if (usia >= 5 && usia <= 6) return 'PAUD (5-6 Tahun)';
       if (usia >= 7 && usia <= 12) return 'Cabe Rawit (Kls 1-6 SD)';
@@ -398,7 +402,8 @@
       const total = database.length;
       const isPria = (d) => ['l', 'pria', 'laki', 'lk', 'laki-laki', 'laki laki'].includes(d.jk) || d.jk.includes('laki');
       const isWanita = (d) => d.jk === 'p' || d.jk === 'wanita' || d.jk === 'perempuan';
-      const isMarried = (d) => d.status1 === 'Kawin' || d.status1 === 'Nikah';
+      const statusLower = (d) => (d.status1 || '').toLowerCase();
+      const isMarried = (d) => statusLower(d) === 'kawin' || statusLower(d) === 'nikah';
 
       const pria = database.filter(isPria).length;
       const wanita = database.filter(isWanita).length;
@@ -437,7 +442,7 @@
 
       let countKawin = 0, countBelumKawin = 0, countJanda = 0, countDuda = 0;
       database.forEach(d => {
-        const status = (d.status1 || '').toLowerCase();
+        const status = statusLower(d);
         if (status.includes('kawin') || status.includes('nikah')) {
           if (status.includes('belum')) countBelumKawin++;
           else countKawin++;
@@ -549,7 +554,7 @@
 
         Chart.register(ChartDataLabels);
 
-        // 1. Grafik Kategori Usia Jamaah (Interaktif dengan Nama Saja, Urut Abjad)
+        // 1. Grafik Kategori Usia Jamaah
         chartInstances.ageCategory = new Chart(document.getElementById('ageCategoryChart').getContext('2d'), {
           type: 'bar',
           data: {
@@ -614,7 +619,7 @@
           }
         });
 
-        // 2. Generus Donut Chart (Interaktif dengan Nama Saja, Urut Abjad)
+        // 2. Generus Donut Chart
         chartInstances.generus = new Chart(document.getElementById('generusChart').getContext('2d'), {
           type: 'doughnut',
           data: {
@@ -653,7 +658,7 @@
           }
         });
 
-        // 3. Generus Detail Bar Chart (Interaktif dengan Nama Saja, Urut Abjad)
+        // 3. Generus Detail Bar Chart
         chartInstances.generusDetail = new Chart(document.getElementById('generusDetailChart').getContext('2d'), {
           type: 'bar',
           data: {
