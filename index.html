@@ -369,6 +369,8 @@
       return parseInt(cleaned) || 0;
     }
 
+    let lastDataSignature = '';
+
     async function fetchDataFromGoogleSheets(isInitial = false) {
       try {
         const response = await fetch(SCRIPT_URL);
@@ -377,8 +379,16 @@
         if (!result.Database) throw new Error('Data sheet Database tidak ditemukan.');
 
         if (result.error) throw new Error(result.message || 'Gagal membaca Google Sheets.');
-        processData(result.Database, result.Keuangan || [], result.Saldo_Awal || [], result.Transaksi_Keuangan || []);
+
+        // Auto refresh: bandingkan isi data dengan pengambilan sebelumnya.
+        // Jika tidak ada perubahan, tampilan tidak disentuh sama sekali (tidak berkedip).
+        const signature = JSON.stringify([result.Database, result.Keuangan, result.Saldo_Awal, result.Transaksi_Keuangan]);
+        const unchanged = !isInitial && signature === lastDataSignature;
+        lastDataSignature = signature;
         document.getElementById('last-update').textContent = new Date().toLocaleString('id-ID');
+        if (unchanged) return;
+
+        processData(result.Database, result.Keuangan || [], result.Saldo_Awal || [], result.Transaksi_Keuangan || []);
       } catch (error) {
         if (isInitial) {
           showToast('Gagal Sinkronisasi', error.message);
@@ -571,7 +581,10 @@
       const priaPct = Math.round((dbData.pria / total) * 100);
       const wanitaPct = 100 - priaPct;
       const ratioBar = document.getElementById('ratio-bar');
-      if (ratioBar) {
+      if (ratioBar && ratioBar.children.length === 2) {
+        ratioBar.children[0].style.width = priaPct + '%';
+        ratioBar.children[1].style.width = wanitaPct + '%';
+      } else if (ratioBar) {
         ratioBar.innerHTML = `
           <div class="h-full bg-blue-500 rounded-l-full flex items-center justify-center transition-all duration-500" style="width: ${priaPct}%;"></div>
           <div class="h-full bg-rose-400 rounded-r-full flex items-center justify-center transition-all duration-500" style="width: ${wanitaPct}%;"></div>
@@ -592,6 +605,30 @@
       }
     }
 
+    // Buat grafik baru, atau perbarui grafik yang sudah ada di tempat (tanpa dihapus/dibuat ulang)
+    // selama jenis, kanvas, dan "sig" (tema/pengaturan tampilan) sama. Hanya data yang berubah
+    // yang dianimasikan, sehingga tidak ada kedipan saat auto refresh.
+    function upsertChart(key, canvasId, config, sig) {
+      const canvas = document.getElementById(canvasId);
+      const sigValue = String(sig !== undefined ? sig : document.documentElement.getAttribute('data-theme'));
+      const existing = chartInstances[key];
+      if (existing && existing.canvas === canvas && existing.config.type === config.type && existing.$sig === sigValue) {
+        existing.data.labels = config.data.labels;
+        config.data.datasets.forEach((ds, i) => {
+          if (existing.data.datasets[i]) existing.data.datasets[i].data = ds.data;
+          else existing.data.datasets.push(ds);
+        });
+        existing.data.datasets.length = config.data.datasets.length;
+        existing.update();
+        return existing;
+      }
+      safeDestroyChart(key);
+      const chart = new Chart(canvas.getContext('2d'), config);
+      chart.$sig = sigValue;
+      chartInstances[key] = chart;
+      return chart;
+    }
+
     function destroyAllCharts() {
       Object.keys(chartInstances).forEach(key => safeDestroyChart(key));
     }
@@ -601,8 +638,6 @@
       isRenderingCharts = true;
 
       try {
-        destroyAllCharts();
-
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
         const textColor = isDark ? '#94a3b8' : '#475569';
         const gridColor = isDark ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9';
@@ -610,7 +645,7 @@
         Chart.register(ChartDataLabels);
 
         // 1. Grafik Kategori Usia Jamaah
-        chartInstances.ageCategory = new Chart(document.getElementById('ageCategoryChart').getContext('2d'), {
+        upsertChart('ageCategory', 'ageCategoryChart', {
           type: 'bar',
           data: {
             labels: dbData.ageCategory.labels,
@@ -654,7 +689,7 @@
         });
 
         // Status Pernikahan
-        chartInstances.marital = new Chart(document.getElementById('maritalChart').getContext('2d'), {
+        upsertChart('marital', 'maritalChart', {
           type: 'bar',
           data: {
             labels: dbData.marital.labels,
@@ -675,7 +710,7 @@
         });
 
         // 2. Generus Donut Chart
-        chartInstances.generus = new Chart(document.getElementById('generusChart').getContext('2d'), {
+        upsertChart('generus', 'generusChart', {
           type: 'doughnut',
           data: {
             labels: dbData.generus.labels.map(l => l.replace(/\s*\([^)]+\)/, '')),
@@ -714,7 +749,7 @@
         });
 
         // 3. Generus Detail Bar Chart
-        chartInstances.generusDetail = new Chart(document.getElementById('generusDetailChart').getContext('2d'), {
+        upsertChart('generusDetail', 'generusDetailChart', {
           type: 'bar',
           data: {
             labels: dbData.generus.labels,
@@ -770,7 +805,7 @@
         const kasSaldoValues = financeData.items.map(i => i.saldo);
 
         // Grafik Ringkasan Kas
-        chartInstances.kas = new Chart(document.getElementById('kasChart').getContext('2d'), {
+        upsertChart('kas', 'kasChart', {
           type: 'bar',
           data: {
             labels: kasLabels,
@@ -832,6 +867,39 @@
       };
       return map[key] || [key];
     }
+
+    // State & plugin pointer untuk grafik tren (dibaca langsung oleh callback agar tetap
+    // mutakhir ketika grafik diperbarui di tempat).
+    let trendView = { rawLabels: [], incomeValues: [], expenseValues: [], fullTitle: () => '' };
+    const trendPointerState = { index: null, dark: false };
+    const trendPointerPlugin = {
+      id: 'verticalPointer',
+      afterEvent(chart) {
+        const active = chart.getActiveElements();
+        const idx = active.length ? active[0].index : null;
+        if (idx !== trendPointerState.index) {
+          trendPointerState.index = idx;
+          const other = chart === chartInstances.cashTrend ? chartInstances.cashFlow : chartInstances.cashTrend;
+          if (other) other.draw();
+        }
+      },
+      afterDatasetsDraw(chart) {
+        const idx = trendPointerState.index;
+        if (idx === null || idx >= chart.data.labels.length) return;
+        const x = chart.scales.x.getPixelForValue(idx);
+        const { top, bottom } = chart.chartArea;
+        const c = chart.ctx;
+        c.save();
+        c.beginPath();
+        c.moveTo(x, top);
+        c.lineTo(x, bottom);
+        c.lineWidth = 1.5;
+        c.setLineDash([4, 3]);
+        c.strokeStyle = trendPointerState.dark ? 'rgba(226,232,240,0.7)' : 'rgba(30,41,59,0.55)';
+        c.stroke();
+        c.restore();
+      }
+    };
 
     function getCashTrendRows(item) {
       const aliases = getTransactionAliases(item.namaKas);
@@ -929,9 +997,11 @@
         rows.length ? `${rows.length.toLocaleString('id-ID')} transaksi · ${labels.length.toLocaleString('id-ID')} periode` :
         'Belum ada transaksi untuk kas ini';
 
-      safeDestroyChart('cashTrend');
-      safeDestroyChart('cashFlow');
-      if (empty) return;
+      if (empty) {
+        safeDestroyChart('cashTrend');
+        safeDestroyChart('cashFlow');
+        return;
+      }
 
       const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
       const isMobile = window.innerWidth < 640;
@@ -957,35 +1027,11 @@
       };
       const displayLabels = rawLabels.map(tickLabel);
 
-      // Garis vertikal sebagai pointer; posisinya disinkronkan di kedua grafik.
-      let pointerIndex = null;
-      const verticalPointer = {
-        id: 'verticalPointer',
-        afterEvent(chart) {
-          const active = chart.getActiveElements();
-          const idx = active.length ? active[0].index : null;
-          if (idx !== pointerIndex) {
-            pointerIndex = idx;
-            const other = chart === chartInstances.cashTrend ? chartInstances.cashFlow : chartInstances.cashTrend;
-            if (other) other.draw();
-          }
-        },
-        afterDatasetsDraw(chart) {
-          if (pointerIndex === null || pointerIndex >= chart.data.labels.length) return;
-          const x = chart.scales.x.getPixelForValue(pointerIndex);
-          const { top, bottom } = chart.chartArea;
-          const c = chart.ctx;
-          c.save();
-          c.beginPath();
-          c.moveTo(x, top);
-          c.lineTo(x, bottom);
-          c.lineWidth = 1.5;
-          c.setLineDash([4, 3]);
-          c.strokeStyle = isDark ? 'rgba(226,232,240,0.7)' : 'rgba(30,41,59,0.55)';
-          c.stroke();
-          c.restore();
-        }
-      };
+      // Perbarui state yang dibaca callback tooltip dan pointer.
+      trendPointerState.dark = isDark;
+      trendView = { rawLabels, incomeValues, expenseValues, fullTitle };
+      // Bila pengaturan tampilan sama, grafik cukup diperbarui di tempat (tanpa dibuat ulang).
+      const shapeSig = [item.namaKas, period, isMobile, isDark].join('|');
 
       // Pola garis diagonal untuk pengeluaran agar tidak hanya dibedakan lewat warna.
       const flowCtx = document.getElementById('cashFlowChart').getContext('2d');
@@ -1020,7 +1066,7 @@
         footerFont: { size: isMobile ? 12 : 13, weight: 'bold' },
         boxPadding: 4,
         callbacks: {
-          title: items => fullTitle(rawLabels[items[0].dataIndex]),
+          title: items => trendView.fullTitle(trendView.rawLabels[items[0].dataIndex]),
           label: context => `${context.dataset.label}: ${formatCurrency(context.parsed.y || 0)}`
         }
       };
@@ -1032,9 +1078,9 @@
       const singlePoint = labels.length <= 2;
 
       // Grafik 1: saldo (garis + area gradasi)
-      chartInstances.cashTrend = new Chart(document.getElementById('cashTrendChart').getContext('2d'), {
+      upsertChart('cashTrend', 'cashTrendChart', {
         type: 'line',
-        plugins: [verticalPointer],
+        plugins: [trendPointerPlugin],
         data: {
           labels: displayLabels,
           datasets: [{
@@ -1067,12 +1113,12 @@
           },
           scales: { x: xAxis, y: yAxis }
         }
-      });
+      }, shapeSig);
 
       // Grafik 2: pemasukan (hijau polos) dan pengeluaran (merah bergaris diagonal)
-      chartInstances.cashFlow = new Chart(flowCtx, {
+      upsertChart('cashFlow', 'cashFlowChart', {
         type: 'bar',
-        plugins: [verticalPointer],
+        plugins: [trendPointerPlugin],
         data: {
           labels: displayLabels,
           datasets: [
@@ -1095,7 +1141,7 @@
                 ...tooltipBase.callbacks,
                 footer: items => {
                   const i = items[0].dataIndex;
-                  const net = (incomeValues[i] || 0) - (expenseValues[i] || 0);
+                  const net = (trendView.incomeValues[i] || 0) - (trendView.expenseValues[i] || 0);
                   return 'Selisih: ' + (net < 0 ? '-' : '+') + formatCurrency(Math.abs(net));
                 }
               }
@@ -1103,7 +1149,7 @@
           },
           scales: { x: xAxis, y: { ...yAxis, beginAtZero: true } }
         }
-      });
+      }, shapeSig);
     }
 
     function formatCompactCurrency(value) {
