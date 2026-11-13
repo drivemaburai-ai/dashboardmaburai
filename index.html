@@ -851,7 +851,8 @@
     // Transaksi_Keuangan menyimpan nama kas operasional. Pemetaan ini mengikuti
     // nama-nama yang ditemukan pada workbook Database Maburai 2026.
     function normalizeCashName(value) {
-      return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      // 'q' disamakan dengan 'k' agar "Qurban" dan "Kurban" dianggap nama yang sama.
+      return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '').replace(/q/g, 'k');
     }
 
     function getTransactionAliases(summaryName) {
@@ -865,7 +866,9 @@
         'tabungankurban': ['kastabungankurban'],
         'taliasihkelompok': ['kastaliasih', 'kastaliasihkelompok']
       };
-      return map[key] || [key];
+      // Selalu sertakan nama aslinya (dengan dan tanpa awalan "kas") agar variasi penulisan tetap cocok.
+      const base = key.startsWith('kas') ? key.slice(3) : key;
+      return Array.from(new Set([...(map[key] || []), key, base, 'kas' + base]));
     }
 
     // State & plugin pointer untuk grafik tren (dibaca langsung oleh callback agar tetap
@@ -901,12 +904,21 @@
       }
     };
 
+    // Terima format YYYY-MM-DD (atau ISO) maupun DD/MM/YYYY.
+    function normalizeTransactionDate(value) {
+      const str = String(value || '').trim();
+      if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
+      const m = str.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})/);
+      if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+      return '';
+    }
+
     function getCashTrendRows(item) {
       const aliases = getTransactionAliases(item.namaKas);
       return financeData.transactions.filter(row =>
         aliases.includes(normalizeCashName(row.Nama_Kas))
       ).map(row => ({
-        date: String(row.Tanggal || '').slice(0, 10),
+        date: normalizeTransactionDate(row.Tanggal),
         income: Number(row.Pemasukan) || 0,
         expense: Number(row.Pengeluaran) || 0,
         balance: row.Saldo_Berjalan === null || row.Saldo_Berjalan === '' ? null : Number(row.Saldo_Berjalan),
@@ -998,6 +1010,10 @@
         'Belum ada transaksi untuk kas ini';
 
       if (empty) {
+        const names = Array.from(new Set(financeData.transactions.map(r => String(r.Nama_Kas || '').trim()).filter(Boolean)));
+        document.getElementById('trend-empty').textContent =
+          'Belum ada transaksi yang cocok untuk kas ini.' +
+          (names.length ? ' Nama kas pada data transaksi: ' + names.join(', ') + '.' : ' Data transaksi belum terbaca.');
         safeDestroyChart('cashTrend');
         safeDestroyChart('cashFlow');
         return;
