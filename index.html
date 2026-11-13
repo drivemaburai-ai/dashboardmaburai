@@ -231,11 +231,44 @@
         <div class="flex justify-between items-center mb-5 flex-wrap gap-4">
           <div>
             <h3 class="text-lg font-bold tracking-tight" style="color: var(--text-primary);">Ringkasan Kas</h3>
-            <p class="text-xs mt-0.5" style="color: var(--text-secondary);">Klik salah satu bar grafik di bawah untuk melihat rincian kas secara mendalam.</p>
+            <p class="text-xs mt-0.5" style="color: var(--text-secondary);">Klik salah satu kas untuk menampilkan tren pemasukan, pengeluaran, dan saldo dari waktu ke waktu.</p>
           </div>
           <span class="px-2.5 py-1 rounded-md text-xs font-medium bg-sky-500/10 text-sky-500 border border-sky-500/20">Interaktif</span>
         </div>
         <div class="chart-container" style="height: 380px;"><canvas id="kasChart"></canvas></div>
+        <div id="cash-trend-panel" class="mt-6 rounded-2xl border p-4 md:p-5 hidden" style="border-color: var(--border-color); background: var(--bg-primary);">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div>
+              <p class="text-[11px] uppercase tracking-wider font-bold text-sky-500">Analisis Tren Kas</p>
+              <h4 id="trend-title" class="text-lg font-bold mt-1" style="color: var(--text-primary);">Pilih salah satu kas</h4>
+              <p id="trend-subtitle" class="text-xs mt-1" style="color: var(--text-secondary);">Grafik transaksi dan perkembangan saldo</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <label for="trend-period" class="text-xs" style="color: var(--text-secondary);">Periode</label>
+              <select id="trend-period" onchange="refreshCashTrend()" class="rounded-lg border px-3 py-2 text-xs outline-none" style="background: var(--bg-secondary); color: var(--text-primary); border-color: var(--border-color);">
+                <option value="month">Bulanan</option>
+                <option value="year">Tahunan</option>
+                <option value="day">Harian</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+            <div class="rounded-xl p-3" style="background: var(--bg-secondary);">
+              <p class="text-[10px] uppercase tracking-wide" style="color: var(--text-secondary);">Total Pemasukan</p>
+              <p id="trend-income" class="text-base md:text-lg font-extrabold text-emerald-500 mt-1">Rp0</p>
+            </div>
+            <div class="rounded-xl p-3" style="background: var(--bg-secondary);">
+              <p class="text-[10px] uppercase tracking-wide" style="color: var(--text-secondary);">Total Pengeluaran</p>
+              <p id="trend-expense" class="text-base md:text-lg font-extrabold text-rose-500 mt-1">Rp0</p>
+            </div>
+            <div class="rounded-xl p-3" style="background: var(--bg-secondary);">
+              <p class="text-[10px] uppercase tracking-wide" style="color: var(--text-secondary);">Saldo Terakhir</p>
+              <p id="trend-balance" class="text-base md:text-lg font-extrabold text-sky-500 mt-1">Rp0</p>
+            </div>
+          </div>
+          <div class="chart-container" style="height: 320px;"><canvas id="cashTrendChart"></canvas></div>
+          <p id="trend-empty" class="hidden text-center text-xs py-5" style="color: var(--text-secondary);">Belum ada transaksi yang cocok untuk kas ini.</p>
+        </div>
       </div>
     </section>
   </main>
@@ -271,7 +304,7 @@
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyuomsVlvTt12Se7lnb1oMb-m9QgYqPqXTHKvVJn9nyRQyaoyqml0igzK_jzh_hcVSt/exec";
 
     let dbData = { total: 0, pria: 0, wanita: 0, kk: 0, ageCategory: { labels: [], values: [] }, generus: { labels: [], values: [], pria: [], wanita: [] }, marital: { labels: [], values: [] }, database: [] };
-    let financeData = { kas: { total: 0, pemasukan: 0, pengeluaran: 0 }, items: [] };
+    let financeData = { kas: { total: 0, pemasukan: 0, pengeluaran: 0 }, items: [], opening: [], transactions: [] };
 
     function toggleTheme() {
       const html = document.documentElement;
@@ -334,7 +367,8 @@
         
         if (!result.Database) throw new Error('Data sheet Database tidak ditemukan.');
 
-        processData(result.Database, result.Keuangan || []);
+        if (result.error) throw new Error(result.message || 'Gagal membaca Google Sheets.');
+        processData(result.Database, result.Keuangan || [], result.Saldo_Awal || [], result.Transaksi_Keuangan || []);
         document.getElementById('last-update').textContent = new Date().toLocaleString('id-ID');
       } catch (error) {
         if (isInitial) {
@@ -387,7 +421,9 @@
       return null;
     }
 
-    function processData(rawDbRows, rawFinRows) {
+    function processData(rawDbRows, rawFinRows, rawOpeningRows = [], rawTransactionRows = []) {
+      financeData.opening = rawOpeningRows || [];
+      financeData.transactions = (rawTransactionRows || []).filter(r => r && r.Tanggal && r.Nama_Kas && (r.Pemasukan || r.Pengeluaran || r.Saldo_Berjalan !== null));
       const database = rawDbRows.map(row => ({
         no: String(row.No || ''),
         nama: String(row.Nama || ''),
@@ -536,6 +572,7 @@
       document.getElementById('ratio-wanita').textContent = wanitaPct + '%';
     }
 
+    let selectedCashItem = null;
     const chartInstances = {};
     let isRenderingCharts = false;
 
@@ -738,27 +775,7 @@
                 const index = elements[0].index;
                 const item = financeData.items[index];
                 if (item) {
-                  const content = `
-                    <div class="space-y-3 text-sm">
-                      <div class="flex justify-between items-center border-b pb-2" style="border-color: var(--border-color);">
-                        <span style="color: var(--text-secondary);">Nama Kas</span>
-                        <span class="font-bold text-sky-500">${item.namaKas}</span>
-                      </div>
-                      <div class="flex justify-between items-center border-b pb-2" style="border-color: var(--border-color);">
-                        <span style="color: var(--text-secondary);">Total Pemasukan</span>
-                        <span class="font-semibold text-emerald-500">${formatCurrency(item.kredit)}</span>
-                      </div>
-                      <div class="flex justify-between items-center border-b pb-2" style="border-color: var(--border-color);">
-                        <span style="color: var(--text-secondary);">Total Pengeluaran</span>
-                        <span class="font-semibold text-rose-500">${formatCurrency(item.debit)}</span>
-                      </div>
-                      <div class="flex justify-between items-center pt-1">
-                        <span class="font-medium" style="color: var(--text-secondary);">Sisa Saldo</span>
-                        <span class="font-bold text-base" style="color: var(--text-primary);">${formatCurrency(item.saldo)}</span>
-                      </div>
-                    </div>
-                  `;
-                  openModal('Rincian Kas: ' + item.namaKas, content);
+                  showCashTrend(item);
                 }
               }
             },
@@ -782,6 +799,164 @@
       } finally {
         isRenderingCharts = false;
       }
+      if (selectedCashItem) drawCashTrend();
+    }
+
+
+    // Nama kas pada sheet Keuangan merupakan kelompok ringkasan, sedangkan
+    // Transaksi_Keuangan menyimpan nama kas operasional. Pemetaan ini mengikuti
+    // nama-nama yang ditemukan pada workbook Database Maburai 2026.
+    function normalizeCashName(value) {
+      return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+
+    function getTransactionAliases(summaryName) {
+      const key = normalizeCashName(summaryName);
+      const map = {
+        'kelompok': ['kaskelompok'],
+        'ppggenerus': ['kasgenerus'],
+        'remajapraremaja': ['kasremaja'],
+        'caberawit': ['kascaberawit'],
+        'masjidmaburai': ['kासmasjidmaburai', 'kasmasjidmaburai'],
+        'tabungankurban': ['kastabungankurban'],
+        'taliasihkelompok': ['kastaliasih', 'kastaliasihkelompok']
+      };
+      return map[key] || [key];
+    }
+
+    function showCashTrend(item) {
+      selectedCashItem = item;
+      const panel = document.getElementById('cash-trend-panel');
+      panel.classList.remove('hidden');
+      document.getElementById('trend-title').textContent = item.namaKas;
+      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      drawCashTrend();
+    }
+
+    function refreshCashTrend() {
+      if (selectedCashItem) drawCashTrend();
+    }
+
+    function drawCashTrend() {
+      if (!selectedCashItem) return;
+      const item = selectedCashItem;
+      const aliases = getTransactionAliases(item.namaKas);
+      const rows = financeData.transactions.filter(row =>
+        aliases.includes(normalizeCashName(row.Nama_Kas))
+      ).map(row => ({
+        date: String(row.Tanggal || '').slice(0, 10),
+        income: Number(row.Pemasukan) || 0,
+        expense: Number(row.Pengeluaran) || 0,
+        balance: row.Saldo_Berjalan === null || row.Saldo_Berjalan === '' ? null : Number(row.Saldo_Berjalan),
+        description: String(row.Keterangan || '')
+      })).filter(row => /^\d{4}-\d{2}-\d{2}$/.test(row.date))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      const totalIncome = rows.reduce((sum, row) => sum + row.income, 0);
+      const totalExpense = rows.reduce((sum, row) => sum + row.expense, 0);
+      const openingNames = aliases;
+      const opening = financeData.opening.find(row =>
+        openingNames.includes(normalizeCashName(row.Nama_Kas))
+      );
+      const lastBalance = rows.length && rows[rows.length - 1].balance !== null
+        ? rows[rows.length - 1].balance
+        : (Number(opening && opening.Saldo_Awal) || 0) + totalIncome - totalExpense;
+
+      document.getElementById('trend-income').textContent = formatCurrency(totalIncome);
+      document.getElementById('trend-expense').textContent = formatCurrency(totalExpense);
+      document.getElementById('trend-balance').textContent = formatCurrency(lastBalance);
+
+      const period = document.getElementById('trend-period').value;
+      const buckets = {};
+      const openingBalance = Number(opening && opening.Saldo_Awal) || 0;
+      rows.forEach(row => {
+        let key = row.date;
+        if (period === 'month') key = row.date.slice(0, 7);
+        if (period === 'year') key = row.date.slice(0, 4);
+        if (!buckets[key]) buckets[key] = { income: 0, expense: 0, balance: null, lastDate: '' };
+        buckets[key].income += row.income;
+        buckets[key].expense += row.expense;
+        if (row.balance !== null && row.date >= buckets[key].lastDate) {
+          buckets[key].balance = row.balance;
+          buckets[key].lastDate = row.date;
+        }
+      });
+
+      const labels = Object.keys(buckets).sort();
+      const incomeValues = labels.map(key => buckets[key].income);
+      const expenseValues = labels.map(key => buckets[key].expense);
+      const balanceValues = labels.map(key => buckets[key].balance);
+
+      // Saldo awal ditampilkan sebagai titik pertama pada tren saldo.
+      const openingDateRaw = opening && opening.Tanggal_Saldo_Awal
+        ? String(opening.Tanggal_Saldo_Awal).slice(0, 10) : '';
+      const openingLabel = period === 'year' ? openingDateRaw.slice(0, 4)
+        : period === 'month' ? openingDateRaw.slice(0, 7) : openingDateRaw;
+      if (openingLabel && !labels.includes(openingLabel)) {
+        labels.unshift(openingLabel);
+        incomeValues.unshift(0);
+        expenseValues.unshift(0);
+        balanceValues.unshift(openingBalance);
+      } else if (openingLabel && labels.includes(openingLabel)) {
+        const pos = labels.indexOf(openingLabel);
+        if (balanceValues[pos] === null) balanceValues[pos] = openingBalance;
+      }
+
+      const empty = rows.length === 0;
+      document.getElementById('cashTrendChart').parentElement.classList.toggle('hidden', empty);
+      document.getElementById('trend-empty').classList.toggle('hidden', !empty);
+      document.getElementById('trend-subtitle').textContent =
+        rows.length ? `${rows.length.toLocaleString('id-ID')} transaksi · ${labels.length.toLocaleString('id-ID')} periode` :
+        'Belum ada transaksi untuk kas ini';
+
+      safeDestroyChart('cashTrend');
+      if (empty) return;
+
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const textColor = isDark ? '#94a3b8' : '#64748b';
+      const gridColor = isDark ? 'rgba(148,163,184,0.12)' : 'rgba(148,163,184,0.18)';
+      const ctx = document.getElementById('cashTrendChart').getContext('2d');
+      chartInstances.cashTrend = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels.map(label => {
+            if (period === 'month') {
+              const [year, month] = label.split('-');
+              return new Date(Number(year), Number(month) - 1, 1).toLocaleDateString('id-ID', { month: 'short', year: 'numeric' });
+            }
+            if (period === 'day') {
+              const [year, month, day] = label.split('-');
+              return new Date(Number(year), Number(month) - 1, Number(day)).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: '2-digit' });
+            }
+            return label;
+          }),
+          datasets: [
+            { label: 'Pemasukan', data: incomeValues, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.10)', tension: .3, fill: false, pointRadius: 2, yAxisID: 'y' },
+            { label: 'Pengeluaran', data: expenseValues, borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,.08)', tension: .3, fill: false, pointRadius: 2, yAxisID: 'y' },
+            { label: 'Saldo', data: balanceValues, borderColor: '#0ea5e9', backgroundColor: 'rgba(14,165,233,.10)', tension: .25, fill: false, pointRadius: 3, borderWidth: 3, yAxisID: 'y1', spanGaps: true }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { color: textColor, usePointStyle: true, boxWidth: 8, font: { size: 11 } } },
+            tooltip: { callbacks: { label: context => `${context.dataset.label}: ${formatCurrency(context.parsed.y || 0)}` } }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: textColor, maxRotation: 45, minRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+            y: { position: 'left', grid: { color: gridColor }, ticks: { color: textColor, callback: value => formatCompactCurrency(value) } },
+            y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: textColor, callback: value => formatCompactCurrency(value) } }
+          }
+        }
+      });
+    }
+
+    function formatCompactCurrency(value) {
+      const abs = Math.abs(Number(value) || 0);
+      if (abs >= 1000000000) return 'Rp' + (value / 1000000000).toFixed(1) + ' M';
+      if (abs >= 1000000) return 'Rp' + (value / 1000000).toFixed(1) + ' jt';
+      if (abs >= 1000) return 'Rp' + (value / 1000).toFixed(0) + ' rb';
+      return 'Rp' + Number(value || 0).toLocaleString('id-ID');
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
