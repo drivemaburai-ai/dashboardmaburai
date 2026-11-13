@@ -65,6 +65,10 @@
     .modal-overlay.show { opacity: 1; pointer-events: auto; }
     .kpi-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
     @media (max-width: 768px) { .chart-container { height: 260px; } }
+    /* Grafik tren kas: tinggi menyesuaikan ukuran layar */
+    .trend-chart-box { position: relative; width: 100%; height: 220px; }
+    @media (min-width: 640px)  { .trend-chart-box { height: 260px; } }
+    @media (min-width: 1024px) { .trend-chart-box { height: 300px; } }
   </style>
 </head>
 <body>
@@ -266,7 +270,12 @@
               <p id="trend-balance" class="text-base md:text-lg font-extrabold text-sky-500 mt-1">Rp0</p>
             </div>
           </div>
-          <div class="chart-container" style="height: 320px;"><canvas id="cashTrendChart"></canvas></div>
+          <div id="trend-charts">
+            <p class="text-xs font-semibold mb-2" style="color: var(--text-primary);">Perkembangan Saldo</p>
+            <div class="trend-chart-box"><canvas id="cashTrendChart"></canvas></div>
+            <p class="text-xs font-semibold mt-5 mb-2" style="color: var(--text-primary);">Pemasukan &amp; Pengeluaran</p>
+            <div class="trend-chart-box"><canvas id="cashFlowChart"></canvas></div>
+          </div>
           <p id="trend-empty" class="hidden text-center text-xs py-5" style="color: var(--text-secondary);">Belum ada transaksi yang cocok untuk kas ini.</p>
         </div>
       </div>
@@ -824,11 +833,31 @@
       return map[key] || [key];
     }
 
+    function getCashTrendRows(item) {
+      const aliases = getTransactionAliases(item.namaKas);
+      return financeData.transactions.filter(row =>
+        aliases.includes(normalizeCashName(row.Nama_Kas))
+      ).map(row => ({
+        date: String(row.Tanggal || '').slice(0, 10),
+        income: Number(row.Pemasukan) || 0,
+        expense: Number(row.Pengeluaran) || 0,
+        balance: row.Saldo_Berjalan === null || row.Saldo_Berjalan === '' ? null : Number(row.Saldo_Berjalan),
+        description: String(row.Keterangan || '')
+      })).filter(row => /^\d{4}-\d{2}-\d{2}$/.test(row.date))
+        .sort((a, b) => a.date.localeCompare(b.date));
+    }
+
     function showCashTrend(item) {
       selectedCashItem = item;
       const panel = document.getElementById('cash-trend-panel');
       panel.classList.remove('hidden');
       document.getElementById('trend-title').textContent = item.namaKas;
+      // Periode otomatis: harian bila data sedikit, bulanan bila banyak, tahunan bila sangat banyak.
+      const autoRows = getCashTrendRows(item);
+      const dayCount = new Set(autoRows.map(r => r.date)).size;
+      const monthCount = new Set(autoRows.map(r => r.date.slice(0, 7))).size;
+      document.getElementById('trend-period').value =
+        dayCount <= 30 ? 'day' : (monthCount > 36 ? 'year' : 'month');
       panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       drawCashTrend();
     }
@@ -841,16 +870,7 @@
       if (!selectedCashItem) return;
       const item = selectedCashItem;
       const aliases = getTransactionAliases(item.namaKas);
-      const rows = financeData.transactions.filter(row =>
-        aliases.includes(normalizeCashName(row.Nama_Kas))
-      ).map(row => ({
-        date: String(row.Tanggal || '').slice(0, 10),
-        income: Number(row.Pemasukan) || 0,
-        expense: Number(row.Pengeluaran) || 0,
-        balance: row.Saldo_Berjalan === null || row.Saldo_Berjalan === '' ? null : Number(row.Saldo_Berjalan),
-        description: String(row.Keterangan || '')
-      })).filter(row => /^\d{4}-\d{2}-\d{2}$/.test(row.date))
-        .sort((a, b) => a.date.localeCompare(b.date));
+      const rows = getCashTrendRows(item);
 
       const totalIncome = rows.reduce((sum, row) => sum + row.income, 0);
       const totalExpense = rows.reduce((sum, row) => sum + row.expense, 0);
@@ -903,50 +923,185 @@
       }
 
       const empty = rows.length === 0;
-      document.getElementById('cashTrendChart').parentElement.classList.toggle('hidden', empty);
+      document.getElementById('trend-charts').classList.toggle('hidden', empty);
       document.getElementById('trend-empty').classList.toggle('hidden', !empty);
       document.getElementById('trend-subtitle').textContent =
         rows.length ? `${rows.length.toLocaleString('id-ID')} transaksi · ${labels.length.toLocaleString('id-ID')} periode` :
         'Belum ada transaksi untuk kas ini';
 
       safeDestroyChart('cashTrend');
+      safeDestroyChart('cashFlow');
       if (empty) return;
 
       const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const isMobile = window.innerWidth < 640;
       const textColor = isDark ? '#94a3b8' : '#64748b';
       const gridColor = isDark ? 'rgba(148,163,184,0.12)' : 'rgba(148,163,184,0.18)';
-      const ctx = document.getElementById('cashTrendChart').getContext('2d');
-      chartInstances.cashTrend = new Chart(ctx, {
+      const rawLabels = labels.slice();
+
+      const parseKey = key => {
+        const [y, m = '1', d = '1'] = key.split('-');
+        return new Date(Number(y), Number(m) - 1, Number(d));
+      };
+      const tickLabel = key => {
+        if (period === 'year') return key;
+        if (period === 'month') {
+          return parseKey(key).toLocaleDateString('id-ID', isMobile ? { month: 'short', year: '2-digit' } : { month: 'short', year: 'numeric' });
+        }
+        return parseKey(key).toLocaleDateString('id-ID', isMobile ? { day: 'numeric', month: 'short' } : { day: '2-digit', month: 'short', year: '2-digit' });
+      };
+      const fullTitle = key => {
+        if (period === 'year') return 'Tahun ' + key;
+        if (period === 'month') return parseKey(key).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+        return parseKey(key).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      };
+      const displayLabels = rawLabels.map(tickLabel);
+
+      // Garis vertikal sebagai pointer; posisinya disinkronkan di kedua grafik.
+      let pointerIndex = null;
+      const verticalPointer = {
+        id: 'verticalPointer',
+        afterEvent(chart) {
+          const active = chart.getActiveElements();
+          const idx = active.length ? active[0].index : null;
+          if (idx !== pointerIndex) {
+            pointerIndex = idx;
+            const other = chart === chartInstances.cashTrend ? chartInstances.cashFlow : chartInstances.cashTrend;
+            if (other) other.draw();
+          }
+        },
+        afterDatasetsDraw(chart) {
+          if (pointerIndex === null || pointerIndex >= chart.data.labels.length) return;
+          const x = chart.scales.x.getPixelForValue(pointerIndex);
+          const { top, bottom } = chart.chartArea;
+          const c = chart.ctx;
+          c.save();
+          c.beginPath();
+          c.moveTo(x, top);
+          c.lineTo(x, bottom);
+          c.lineWidth = 1.5;
+          c.setLineDash([4, 3]);
+          c.strokeStyle = isDark ? 'rgba(226,232,240,0.7)' : 'rgba(30,41,59,0.55)';
+          c.stroke();
+          c.restore();
+        }
+      };
+
+      // Pola garis diagonal untuk pengeluaran agar tidak hanya dibedakan lewat warna.
+      const flowCtx = document.getElementById('cashFlowChart').getContext('2d');
+      const stripe = document.createElement('canvas');
+      stripe.width = stripe.height = 8;
+      const sg = stripe.getContext('2d');
+      sg.fillStyle = isDark ? 'rgba(244,63,94,0.30)' : 'rgba(244,63,94,0.22)';
+      sg.fillRect(0, 0, 8, 8);
+      sg.strokeStyle = '#f43f5e';
+      sg.lineWidth = 2;
+      sg.beginPath();
+      [[0, 8, 8, 0], [-2, 2, 2, -2], [6, 10, 10, 6]].forEach(([x1, y1, x2, y2]) => { sg.moveTo(x1, y1); sg.lineTo(x2, y2); });
+      sg.stroke();
+      const expensePattern = flowCtx.createPattern(stripe, 'repeat');
+
+      const yAxisWidth = isMobile ? 58 : 76;
+      const fontSize = isMobile ? 10 : 11;
+      const xAxis = {
+        grid: { display: false },
+        ticks: { color: textColor, font: { size: fontSize }, maxRotation: 0, minRotation: 0, autoSkip: true, maxTicksLimit: isMobile ? 5 : 10 }
+      };
+      const yAxis = {
+        position: 'left',
+        grid: { color: gridColor },
+        ticks: { color: textColor, font: { size: fontSize }, callback: value => formatCompactCurrency(value) },
+        afterFit: scale => { scale.width = yAxisWidth; }
+      };
+      const tooltipBase = {
+        padding: 10,
+        titleFont: { size: isMobile ? 12 : 13, weight: 'bold' },
+        bodyFont: { size: isMobile ? 12 : 13 },
+        footerFont: { size: isMobile ? 12 : 13, weight: 'bold' },
+        boxPadding: 4,
+        callbacks: {
+          title: items => fullTitle(rawLabels[items[0].dataIndex]),
+          label: context => `${context.dataset.label}: ${formatCurrency(context.parsed.y || 0)}`
+        }
+      };
+      const baseOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false }
+      };
+      const singlePoint = labels.length <= 2;
+
+      // Grafik 1: saldo (garis + area gradasi)
+      chartInstances.cashTrend = new Chart(document.getElementById('cashTrendChart').getContext('2d'), {
         type: 'line',
+        plugins: [verticalPointer],
         data: {
-          labels: labels.map(label => {
-            if (period === 'month') {
-              const [year, month] = label.split('-');
-              return new Date(Number(year), Number(month) - 1, 1).toLocaleDateString('id-ID', { month: 'short', year: 'numeric' });
-            }
-            if (period === 'day') {
-              const [year, month, day] = label.split('-');
-              return new Date(Number(year), Number(month) - 1, Number(day)).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: '2-digit' });
-            }
-            return label;
-          }),
+          labels: displayLabels,
+          datasets: [{
+            label: 'Saldo',
+            data: balanceValues,
+            borderColor: '#0ea5e9',
+            borderWidth: 3,
+            tension: .25,
+            spanGaps: true,
+            fill: 'start',
+            backgroundColor: context => {
+              const area = context.chart.chartArea;
+              if (!area) return 'rgba(14,165,233,.15)';
+              const g = context.chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+              g.addColorStop(0, 'rgba(14,165,233,.35)');
+              g.addColorStop(1, 'rgba(14,165,233,0)');
+              return g;
+            },
+            pointRadius: singlePoint ? 4 : 0,
+            pointHoverRadius: 5,
+            pointHitRadius: 12
+          }]
+        },
+        options: {
+          ...baseOptions,
+          plugins: {
+            legend: { display: false },
+            datalabels: { display: false },
+            tooltip: tooltipBase
+          },
+          scales: { x: xAxis, y: yAxis }
+        }
+      });
+
+      // Grafik 2: pemasukan (hijau polos) dan pengeluaran (merah bergaris diagonal)
+      chartInstances.cashFlow = new Chart(flowCtx, {
+        type: 'bar',
+        plugins: [verticalPointer],
+        data: {
+          labels: displayLabels,
           datasets: [
-            { label: 'Pemasukan', data: incomeValues, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.10)', tension: .3, fill: false, pointRadius: 2, yAxisID: 'y' },
-            { label: 'Pengeluaran', data: expenseValues, borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,.08)', tension: .3, fill: false, pointRadius: 2, yAxisID: 'y' },
-            { label: 'Saldo', data: balanceValues, borderColor: '#0ea5e9', backgroundColor: 'rgba(14,165,233,.10)', tension: .25, fill: false, pointRadius: 3, borderWidth: 3, yAxisID: 'y1', spanGaps: true }
+            { label: 'Pemasukan', data: incomeValues, backgroundColor: '#10b981', borderColor: '#10b981', borderWidth: 1, borderRadius: 3 },
+            { label: 'Pengeluaran', data: expenseValues, backgroundColor: expensePattern, borderColor: '#f43f5e', borderWidth: 1.5, borderRadius: 3 }
           ]
         },
         options: {
-          responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+          ...baseOptions,
+          datasets: { bar: { categoryPercentage: 0.8, barPercentage: 0.95 } },
           plugins: {
-            legend: { labels: { color: textColor, usePointStyle: true, boxWidth: 8, font: { size: 11 } } },
-            tooltip: { callbacks: { label: context => `${context.dataset.label}: ${formatCurrency(context.parsed.y || 0)}` } }
+            legend: {
+              position: 'bottom',
+              labels: { color: textColor, boxWidth: 14, boxHeight: 10, padding: 14, font: { size: fontSize + 1 } }
+            },
+            datalabels: { display: false },
+            tooltip: {
+              ...tooltipBase,
+              callbacks: {
+                ...tooltipBase.callbacks,
+                footer: items => {
+                  const i = items[0].dataIndex;
+                  const net = (incomeValues[i] || 0) - (expenseValues[i] || 0);
+                  return 'Selisih: ' + (net < 0 ? '-' : '+') + formatCurrency(Math.abs(net));
+                }
+              }
+            }
           },
-          scales: {
-            x: { grid: { display: false }, ticks: { color: textColor, maxRotation: 45, minRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
-            y: { position: 'left', grid: { color: gridColor }, ticks: { color: textColor, callback: value => formatCompactCurrency(value) } },
-            y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: textColor, callback: value => formatCompactCurrency(value) } }
-          }
+          scales: { x: xAxis, y: { ...yAxis, beginAtZero: true } }
         }
       });
     }
@@ -958,6 +1113,20 @@
       if (abs >= 1000) return 'Rp' + (value / 1000).toFixed(0) + ' rb';
       return 'Rp' + Number(value || 0).toLocaleString('id-ID');
     }
+
+    // Gambar ulang grafik tren hanya saat layar berpindah antara ukuran HP dan PC.
+    let trendWasMobile = window.innerWidth < 640;
+    let trendResizeTimer = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(trendResizeTimer);
+      trendResizeTimer = setTimeout(() => {
+        const nowMobile = window.innerWidth < 640;
+        if (nowMobile !== trendWasMobile) {
+          trendWasMobile = nowMobile;
+          if (selectedCashItem) drawCashTrend();
+        }
+      }, 200);
+    });
 
     document.addEventListener('DOMContentLoaded', async () => {
       AOS.init({ duration: 800, once: true, easing: 'ease-out-cubic' });
