@@ -874,21 +874,31 @@
     // State & plugin pointer untuk grafik tren (dibaca langsung oleh callback agar tetap
     // mutakhir ketika grafik diperbarui di tempat).
     let trendView = { rawLabels: [], incomeValues: [], expenseValues: [], fullTitle: () => '' };
-    const trendPointerState = { index: null, dark: false };
+    const trendPointerState = { index: null, chart: null, dark: false };
+    // Garis vertikal hanya digambar pada grafik yang sedang disentuh/di-hover.
     const trendPointerPlugin = {
       id: 'verticalPointer',
       afterEvent(chart) {
         const active = chart.getActiveElements();
         const idx = active.length ? active[0].index : null;
-        if (idx !== trendPointerState.index) {
+        const prevChart = trendPointerState.chart;
+        if (idx === null) {
+          // Hanya hapus bila garis memang milik grafik ini.
+          if (prevChart !== chart) return;
+          trendPointerState.index = null;
+          trendPointerState.chart = null;
+        } else {
+          if (idx === trendPointerState.index && prevChart === chart) return;
           trendPointerState.index = idx;
-          const other = chart === chartInstances.cashTrend ? chartInstances.cashFlow : chartInstances.cashTrend;
-          if (other) other.draw();
+          trendPointerState.chart = chart;
         }
+        // Grafik lain digambar ulang agar garis lamanya hilang.
+        const other = chart === chartInstances.cashTrend ? chartInstances.cashFlow : chartInstances.cashTrend;
+        if (other) other.draw();
       },
       afterDatasetsDraw(chart) {
         const idx = trendPointerState.index;
-        if (idx === null || idx >= chart.data.labels.length) return;
+        if (trendPointerState.chart !== chart || idx === null || idx >= chart.data.labels.length) return;
         const x = chart.scales.x.getPixelForValue(idx);
         const { top, bottom } = chart.chartArea;
         const c = chart.ctx;
@@ -896,9 +906,9 @@
         c.beginPath();
         c.moveTo(x, top);
         c.lineTo(x, bottom);
-        c.lineWidth = 1.5;
-        c.setLineDash([4, 3]);
-        c.strokeStyle = trendPointerState.dark ? 'rgba(226,232,240,0.7)' : 'rgba(30,41,59,0.55)';
+        c.lineWidth = 2;
+        c.setLineDash([]);
+        c.strokeStyle = trendPointerState.dark ? '#facc15' : '#0f172a';
         c.stroke();
         c.restore();
       }
